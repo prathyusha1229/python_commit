@@ -1,0 +1,62 @@
+import os
+import random
+import subprocess
+from datetime import datetime
+from crontab import CronTab
+from git import Repo
+
+# Path to the text file
+FILE_PATH = "counter.txt"
+# Path to the Git repository
+REPO_PATH = os.path.dirname(os.path.abspath(__file__))
+
+def increment_counter():
+    """Reads the counter, increments it, and writes it back."""
+    if not os.path.exists(FILE_PATH):
+        count = 0
+    else:
+        with open(FILE_PATH, "r") as f:
+            count = int(f.read().strip() or 0)
+    
+    count += 1
+    
+    with open(FILE_PATH, "w") as f:
+        f.write(str(count))
+    
+    return count
+
+def commit_changes(count):
+    """Commits the updated counter to Git."""
+    repo = Repo(REPO_PATH)
+    repo.git.add(FILE_PATH)
+    commit_message = f"Auto commit: Incremented counter to {count} on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    repo.git.commit("-m", commit_message)
+    repo.git.push()
+
+def update_cron():
+    """Schedules the script to run at a new random time daily."""
+    cron = CronTab(user=True)
+    job = None
+
+    # Remove existing cron job
+    for existing_job in cron:
+        if "auto_commit.py" in str(existing_job):
+            job = existing_job
+            cron.remove(job)
+
+    # Generate a random time
+    random_hour = random.randint(0, 23)
+    random_minute = random.randint(0, 59)
+    
+    # Create a new job
+    job = cron.new(command=f"python3 {os.path.abspath(__file__)}", comment="Auto commit script")
+    job.setall(f"{random_minute} {random_hour} * * *")
+
+    # Save the updated cron jobs
+    cron.write()
+    print(f"Updated cron job to run at {random_hour}:{random_minute} daily.")
+
+if __name__ == "__main__":
+    new_count = increment_counter()
+    commit_changes(new_count)
+    update_cron()
